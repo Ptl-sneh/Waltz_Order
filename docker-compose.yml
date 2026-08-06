@@ -1,0 +1,17 @@
+services:
+  waltz-qa:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3009:3000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ODA_TRIAL_DIR=/app/ODATrial
+      - LD_LIBRARY_PATH=/app/ODATrial
+    volumes:
+      - waltz-drawings:/app/.data
+    restart: unless-stopped
+
+volumes:
+  waltz-drawings:
