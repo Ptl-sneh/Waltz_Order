@@ -5,7 +5,7 @@ import { getDrawingFile, getDrawingRecord } from "@/lib/drawings-storage";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: NextRequest, context: RouteContext<"/api/drawings/[id]/file">) {
+export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
 
   try {

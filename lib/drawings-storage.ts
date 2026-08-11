@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import type { DrawingRecord } from "@/types/editor";
 
@@ -40,6 +40,20 @@ export async function persistDrawing(file: File): Promise<DrawingRecord> {
   return record;
 }
 
+export async function updateDrawingRecord(id: string, updates: Partial<DrawingRecord>): Promise<DrawingRecord> {
+  const existing = await getDrawingRecord(id);
+  if (!existing) {
+    throw new Error("Drawing not found.");
+  }
+  const record: DrawingRecord = {
+    ...existing,
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+  await writeFile(path.join(drawingDir(id), META_NAME), JSON.stringify(record, null, 2));
+  return record;
+}
+
 export async function getDrawingRecord(id: string): Promise<DrawingRecord | null> {
   try {
     const raw = await readFile(path.join(drawingDir(id), META_NAME), "utf8");
@@ -72,4 +86,21 @@ export async function replaceDrawing(id: string, file: File, filename?: string):
   };
   await writeFile(path.join(drawingDir(id), META_NAME), JSON.stringify(record, null, 2));
   return record;
+}
+
+export async function findDrawingByChannelId(channelId: string): Promise<DrawingRecord | null> {
+  try {
+    const entries = await readdir(DRAWING_ROOT, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const record = await getDrawingRecord(entry.name);
+        if (record && record.driveWatchChannelId === channelId) {
+          return record;
+        }
+      }
+    }
+  } catch {
+    // Directory might not exist or other error
+  }
+  return null;
 }

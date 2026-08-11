@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { persistDrawing } from "@/lib/drawings-storage";
+import { persistDrawing, updateDrawingRecord } from "@/lib/drawings-storage";
+import { uploadToGoogleDrive } from "@/lib/google-drive";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only .dwg files are supported." }, { status: 400 });
     }
 
-    const drawing = await persistDrawing(dwg);
+    // 1. Save locally
+    let drawing = await persistDrawing(dwg);
+
+    // 2. Upload to Google Drive
+    try {
+      const buffer = Buffer.from(await dwg.arrayBuffer());
+      const driveRes = await uploadToGoogleDrive(dwg.name, buffer);
+      
+      // 3. Update the drawing record with Drive metadata
+      drawing = await updateDrawingRecord(drawing.id, {
+        driveFileId: driveRes.id,
+        driveWebViewLink: driveRes.webViewLink,
+        driveModifiedTime: driveRes.modifiedTime ?? undefined,
+      });
+    } catch (driveError) {
+      console.error("Failed to upload to Google Drive:", driveError);
+      // We can decide to either fail the whole upload, or just let it be a local file.
+      // Failing it is safer if we strictly rely on Drive now.
+      return NextResponse.json({ error: "Failed to sync to Google Drive." }, { status: 500 });
+    }
+
     return NextResponse.json({ success: true, drawing });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to upload drawing.";

@@ -16,6 +16,10 @@ export interface DrawingRecord {
   dwgUrl: string;
   size: number;
   updatedAt: string;
+  driveFileId?: string;
+  driveWebViewLink?: string;
+  driveModifiedTime?: string;
+  driveWatchChannelId?: string;
 }
 
 export interface DrawingTarget {

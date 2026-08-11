@@ -4,7 +4,7 @@ import { getDrawingRecord, replaceDrawing } from "@/lib/drawings-storage";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: NextRequest, context: RouteContext<"/api/drawings/[id]">) {
+export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const record = await getDrawingRecord(id);
   if (!record) {
@@ -13,7 +13,7 @@ export async function GET(_request: NextRequest, context: RouteContext<"/api/dra
   return NextResponse.json(record);
 }
 
-export async function PUT(request: NextRequest, context: RouteContext<"/api/drawings/[id]">) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
 
   try {
