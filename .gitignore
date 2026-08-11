@@ -42,3 +42,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+symmetric-flag-505106-j8-388acd6e8e85.json

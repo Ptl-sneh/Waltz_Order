@@ -13,7 +13,7 @@ function contentTypeFor(path: string) {
   return "application/octet-stream";
 }
 
-export async function GET(_request: NextRequest, context: RouteContext<"/api/oda-fps/[...path]">) {
+export async function GET(_request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
   const safePath = path.join("/");
 

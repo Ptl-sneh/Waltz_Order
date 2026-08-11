@@ -9,6 +9,10 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ODA_TRIAL_DIR=/app/ODATrial
       - LD_LIBRARY_PATH=/app/ODATrial
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - GOOGLE_SERVICE_ACCOUNT_KEY_BASE64=${GOOGLE_SERVICE_ACCOUNT_KEY_BASE64}
+      - GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID}
+      - GOOGLE_CLIENT_EMAIL=${GOOGLE_CLIENT_EMAIL}
     volumes:
       - waltz-drawings:/app/.data
     restart: unless-stopped
