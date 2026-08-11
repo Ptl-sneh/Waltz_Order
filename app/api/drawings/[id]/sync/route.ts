@@ -38,41 +38,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       });
 
       let notFoundCount = 0;
+      let lastSentModifiedTime = drawing.driveModifiedTime || "";
 
       while (!isClosed) {
         try {
           const currentDrawing = await getDrawingRecord(id);
           if (!currentDrawing) {
             notFoundCount++;
-            if (notFoundCount > 3) break; // Break only after consecutive failures
+            if (notFoundCount > 3) break;
             await new Promise((resolve) => setTimeout(resolve, 5000));
             continue;
           }
           notFoundCount = 0;
 
-          const metadata = await getDriveFileMetadata(driveFileId);
-          if (metadata.modifiedTime) {
-            const localTime = currentDrawing.driveModifiedTime ? new Date(currentDrawing.driveModifiedTime).getTime() : 0;
-            const driveTime = new Date(metadata.modifiedTime).getTime();
-
-            if (driveTime > localTime) {
-              const buffer = await downloadDriveFile(driveFileId);
-              const fileMock = {
-                arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
-                size: buffer.length,
-              } as unknown as File;
-              
-              await replaceDrawing(id, fileMock, filename);
-              await updateDrawingRecord(id, { driveModifiedTime: metadata.modifiedTime });
-              
-              sendEvent({ updated: true, lastSynced: metadata.modifiedTime });
-            } else {
-              // Send an SSE comment to act as a heartbeat to keep the connection alive.
-              // This is completely invisible to the browser's EventSource.onmessage listener.
-              try {
-                controller.enqueue(encoder.encode(`: heartbeat\n\n`));
-              } catch (e) {}
-            }
+          if (currentDrawing.driveModifiedTime && currentDrawing.driveModifiedTime !== lastSentModifiedTime) {
+            lastSentModifiedTime = currentDrawing.driveModifiedTime;
+            sendEvent({ updated: true, lastSynced: lastSentModifiedTime });
+          } else {
+            // Send an SSE comment to act as a heartbeat to keep the connection alive.
+            try {
+              controller.enqueue(encoder.encode(`: heartbeat\n\n`));
+            } catch (e) {}
           }
         } catch (error) {
           console.error("Failed to sync drawing in SSE:", error);
@@ -82,6 +68,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         if (isClosed) break;
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
+
       
       try {
         controller.close();

@@ -78,3 +78,18 @@ export async function downloadDriveFile(fileId: string): Promise<Buffer> {
   return Buffer.from(response.data as ArrayBuffer);
 }
 
+export async function watchDriveFile(fileId: string, channelId: string, webhookUrl: string) {
+  const drive = await getDriveClient();
+  
+  const response = await drive.files.watch({
+    fileId,
+    supportsAllDrives: true,
+    requestBody: {
+      id: channelId,
+      type: "web_hook",
+      address: webhookUrl,
+    },
+  });
+
+  return response.data;
+}
