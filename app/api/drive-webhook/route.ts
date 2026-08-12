@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findDrawingByChannelId, replaceDrawing, updateDrawingRecord } from "@/lib/drawings-storage";
 import { getDriveFileMetadata, downloadDriveFile } from "@/lib/google-drive";
+import { syncEvents } from "@/lib/events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,10 +26,17 @@ export async function POST(request: NextRequest) {
     // Google drive webhook for updates
     if (resourceState === "update") {
       console.info(`[Webhook] Processing update for channel: ${channelId}`);
+      
       const drawing = await findDrawingByChannelId(channelId);
       if (!drawing || !drawing.driveFileId) {
         console.warn(`Webhook received for unknown channel: ${channelId}`);
         return new NextResponse(null, { status: 200 }); // Return 200 so Google stops retrying
+      }
+
+      const receivedToken = request.headers.get("x-goog-channel-token");
+      if (receivedToken !== drawing.driveWatchToken) {
+        console.warn(`[Webhook] Invalid token for channel: ${channelId}. Rejecting request.`);
+        return new NextResponse(null, { status: 401 });
       }
 
       console.info(`[Webhook] Found drawing ID: ${drawing.id}. Fetching metadata for Drive file: ${drawing.driveFileId}`);
@@ -52,6 +60,9 @@ export async function POST(request: NextRequest) {
           await replaceDrawing(drawing.id, fileMock, drawing.filename);
           await updateDrawingRecord(drawing.id, { driveModifiedTime: metadata.modifiedTime });
           console.info(`[Webhook] Successfully updated drawing ${drawing.id} on disk.`);
+          
+          // Emit direct event to SSE connected clients
+          syncEvents.emit("sync", drawing.id, metadata.modifiedTime);
         } else {
           console.info(`[Webhook] Local file is already up to date. Skipping download.`);
         }

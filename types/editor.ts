@@ -20,6 +20,9 @@ export interface DrawingRecord {
   driveWebViewLink?: string;
   driveModifiedTime?: string;
   driveWatchChannelId?: string;
+  driveWatchResourceId?: string;
+  driveWatchToken?: string;
+  driveWatchExpiration?: number;
 }
 
 export interface DrawingTarget {

@@ -28,18 +28,28 @@ export async function POST(request: NextRequest) {
       
       const appUrl = process.env.NEXT_PUBLIC_APP_URL;
       let driveWatchChannelId;
+      let channelToken;
+      let driveWatchResourceId;
+      let driveWatchExpiration;
 
       if (appUrl) {
         driveWatchChannelId = crypto.randomUUID();
+        channelToken = crypto.randomUUID();
+        driveWatchExpiration = Date.now() + 7 * 24 * 60 * 60 * 1000 - 60 * 60 * 1000; // 7 days minus 1 hour
+
         try {
-          await watchDriveFile(driveRes.id, driveWatchChannelId, `${appUrl}/api/drive-webhook`);
+          const watchResponse = await watchDriveFile(driveRes.id, driveWatchChannelId, `${appUrl}/api/drive-webhook`, channelToken, driveWatchExpiration);
+          driveWatchResourceId = watchResponse.resourceId ?? undefined;
+          
         } catch (watchError) {
           console.error("Failed to register webhook with Google (expected if on localhost or unverified domain).");
           console.log("\n--- LOCAL TESTING ---");
           console.log(`To simulate the Google Webhook locally, run this command in a new terminal after you edit the file in Google Drive/AutoCAD:\n`);
-          console.log(`curl -X POST http://localhost:3000/api/drive-webhook -H "x-goog-channel-id: ${driveWatchChannelId}" -H "x-goog-resource-state: update"`);
+          console.log(`curl -X POST http://localhost:3000/api/drive-webhook -H "x-goog-channel-id: ${driveWatchChannelId}" -H "x-goog-resource-state: update" -H "x-goog-channel-token: ${channelToken}"`);
           console.log("---------------------\n");
           // Notice we DO NOT set driveWatchChannelId to undefined here, so the local simulation will successfully find it!
+          
+          driveWatchResourceId = "mock_resource_id";
         }
       } else {
         console.warn("NEXT_PUBLIC_APP_URL is not set. Webhooks disabled.");
@@ -51,6 +61,9 @@ export async function POST(request: NextRequest) {
         driveWebViewLink: driveRes.webViewLink,
         driveModifiedTime: driveRes.modifiedTime ?? undefined,
         driveWatchChannelId: driveWatchChannelId,
+        driveWatchResourceId: driveWatchResourceId,
+        driveWatchToken: channelToken,
+        driveWatchExpiration: driveWatchExpiration,
       });
     } catch (driveError) {
       console.error("Failed to upload to Google Drive:", driveError);

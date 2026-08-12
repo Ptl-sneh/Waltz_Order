@@ -78,7 +78,7 @@ export async function downloadDriveFile(fileId: string): Promise<Buffer> {
   return Buffer.from(response.data as ArrayBuffer);
 }
 
-export async function watchDriveFile(fileId: string, channelId: string, webhookUrl: string) {
+export async function watchDriveFile(fileId: string, channelId: string, webhookUrl: string, token: string, expirationMs: number) {
   const drive = await getDriveClient();
   
   const response = await drive.files.watch({
@@ -88,8 +88,21 @@ export async function watchDriveFile(fileId: string, channelId: string, webhookU
       id: channelId,
       type: "web_hook",
       address: webhookUrl,
+      token,
+      expiration: expirationMs.toString(),
     },
   });
 
   return response.data;
+}
+
+export async function stopDriveWatch(channelId: string, resourceId: string) {
+  const drive = await getDriveClient();
+  
+  await drive.channels.stop({
+    requestBody: {
+      id: channelId,
+      resourceId: resourceId,
+    },
+  });
 }

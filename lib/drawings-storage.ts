@@ -104,3 +104,22 @@ export async function findDrawingByChannelId(channelId: string): Promise<Drawing
   }
   return null;
 }
+
+export async function getExpiringDrawings(timeThresholdMs: number = 24 * 60 * 60 * 1000): Promise<DrawingRecord[]> {
+  const expiring: DrawingRecord[] = [];
+  try {
+    const entries = await readdir(DRAWING_ROOT, { withFileTypes: true });
+    const now = Date.now();
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const record = await getDrawingRecord(entry.name);
+        if (record && record.driveWatchExpiration && (record.driveWatchExpiration - now) < timeThresholdMs) {
+          expiring.push(record);
+        }
+      }
+    }
+  } catch {
+    // Ignore read errors
+  }
+  return expiring;
+}
