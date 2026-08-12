@@ -14,35 +14,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing channel id" }, { status: 400 });
     }
 
+    console.info(`[Webhook] Received ping for channel: ${channelId} | state: ${resourceState}`);
+
     if (resourceState === "sync") {
       // This is the initial verification ping from Google, just acknowledge it.
+      console.info(`[Webhook] Acknowledging initial sync for channel: ${channelId}`);
       return new NextResponse(null, { status: 200 });
     }
 
     // Google drive webhook for updates
     if (resourceState === "update") {
+      console.info(`[Webhook] Processing update for channel: ${channelId}`);
       const drawing = await findDrawingByChannelId(channelId);
       if (!drawing || !drawing.driveFileId) {
         console.warn(`Webhook received for unknown channel: ${channelId}`);
         return new NextResponse(null, { status: 200 }); // Return 200 so Google stops retrying
       }
 
+      console.info(`[Webhook] Found drawing ID: ${drawing.id}. Fetching metadata for Drive file: ${drawing.driveFileId}`);
       const metadata = await getDriveFileMetadata(drawing.driveFileId);
       
       if (metadata.modifiedTime) {
         const localTime = drawing.driveModifiedTime ? new Date(drawing.driveModifiedTime).getTime() : 0;
         const driveTime = new Date(metadata.modifiedTime).getTime();
+        
+        console.info(`[Webhook] Time check - Local: ${localTime} (${drawing.driveModifiedTime}) | Drive: ${driveTime} (${metadata.modifiedTime})`);
 
         if (driveTime > localTime) {
+          console.info(`[Webhook] Drive file is newer. Downloading updated file for drawing: ${drawing.id}...`);
           const buffer = await downloadDriveFile(drawing.driveFileId);
           const fileMock = {
             arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
             size: buffer.length,
           } as unknown as File;
           
+          console.info(`[Webhook] Download complete. Saving ${buffer.length} bytes to local disk...`);
           await replaceDrawing(drawing.id, fileMock, drawing.filename);
           await updateDrawingRecord(drawing.id, { driveModifiedTime: metadata.modifiedTime });
-          console.log(`Webhook successfully updated drawing ${drawing.id}`);
+          console.info(`[Webhook] Successfully updated drawing ${drawing.id} on disk.`);
+        } else {
+          console.info(`[Webhook] Local file is already up to date. Skipping download.`);
         }
       }
     }

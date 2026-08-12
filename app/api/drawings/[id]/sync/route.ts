@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
-import { getDrawingRecord, replaceDrawing, updateDrawingRecord } from "@/lib/drawings-storage";
-import { getDriveFileMetadata, downloadDriveFile } from "@/lib/google-drive";
+import { getDrawingRecord } from "@/lib/drawings-storage";
+import { watch } from "node:fs";
+import path from "node:path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,8 +18,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return new Response("No drive file linked", { status: 400 });
   }
 
-  const driveFileId = drawing.driveFileId;
-  const filename = drawing.filename;
+  const recordPath = path.join(process.cwd(), ".data", "drawings", id, "record.json");
+  console.info(`[SSE Sync] Client connected to sync route for drawing ID: ${id}`);
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -32,47 +33,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         }
       };
 
-      let isClosed = false;
-      request.signal.addEventListener("abort", () => {
-        isClosed = true;
-      });
-
-      let notFoundCount = 0;
       let lastSentModifiedTime = drawing.driveModifiedTime || "";
 
-      while (!isClosed) {
+      // Use fs.watch for event-driven updates instead of polling
+      const watcher = watch(recordPath, async (eventType) => {
         try {
           const currentDrawing = await getDrawingRecord(id);
-          if (!currentDrawing) {
-            notFoundCount++;
-            if (notFoundCount > 3) break;
-            await new Promise((resolve) => setTimeout(resolve, 5000));
-            continue;
-          }
-          notFoundCount = 0;
-
-          if (currentDrawing.driveModifiedTime && currentDrawing.driveModifiedTime !== lastSentModifiedTime) {
+          if (currentDrawing && currentDrawing.driveModifiedTime && currentDrawing.driveModifiedTime !== lastSentModifiedTime) {
+            console.info(`[SSE Sync] Disk change detected for ${id}. Sending update event to client.`);
             lastSentModifiedTime = currentDrawing.driveModifiedTime;
             sendEvent({ updated: true, lastSynced: lastSentModifiedTime });
-          } else {
-            // Send an SSE comment to act as a heartbeat to keep the connection alive.
-            try {
-              controller.enqueue(encoder.encode(`: heartbeat\n\n`));
-            } catch (e) {}
           }
         } catch (error) {
-          console.error("Failed to sync drawing in SSE:", error);
-          sendEvent({ error: "Failed to sync drawing" });
+          console.error("[SSE Sync] Failed to read drawing during watch:", error);
         }
+      });
 
-        if (isClosed) break;
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      }
-
-      
-      try {
-        controller.close();
-      } catch (e) {}
+      // Cleanup when the client disconnects
+      request.signal.addEventListener("abort", () => {
+        console.info(`[SSE Sync] Client disconnected from drawing ID: ${id}. Cleaning up watcher.`);
+        watcher.close();
+      });
     }
   });
 

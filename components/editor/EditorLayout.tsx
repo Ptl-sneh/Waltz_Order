@@ -10,6 +10,7 @@ import type { DrawingRecord } from "@/types/editor";
 
 export function EditorLayout({ drawing }: { drawing: DrawingRecord }) {
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
+  const [hasUpdates, setHasUpdates] = useState(false);
 
   useEffect(() => {
     if (!drawing.driveFileId) return;
@@ -21,6 +22,7 @@ export function EditorLayout({ drawing }: { drawing: DrawingRecord }) {
         const data = JSON.parse(event.data);
         if (data.updated) {
           setSyncStatus("synced");
+          setHasUpdates(true);
           toast.success("DWG file synchronized!", {
             description: "Changes from AutoCAD have been saved.",
           });
@@ -87,7 +89,7 @@ export function EditorLayout({ drawing }: { drawing: DrawingRecord }) {
               <ul className="list-disc pl-4 space-y-1">
                 <li>You must have a paid Autodesk subscription.</li>
                 <li>The first time you do this, you will need to authorize the AutoCAD web app Marketplace connector.</li>
-                <li>Changes made in AutoCAD will automatically sync back to this system every 5 seconds.</li>
+                <li>Changes made in AutoCAD will instantly sync back to this system.</li>
               </ul>
             </div>
 
@@ -111,11 +113,11 @@ export function EditorLayout({ drawing }: { drawing: DrawingRecord }) {
               <Button 
                 render={<a href={drawing.dwgUrl} download={drawing.filename} />}
                 nativeButton={false}
-                variant="secondary"
-                className="w-full gap-2" 
+                variant={hasUpdates ? "default" : "secondary"}
+                className={cn("w-full gap-2 transition-all duration-500", hasUpdates && "ring-2 ring-primary ring-offset-2")}
                 size="lg"
               >
-                Download original DWG
+                {hasUpdates ? "Download updated DWG" : "Download original DWG"}
                 <Download className="h-4 w-4" />
               </Button>
             </div>
